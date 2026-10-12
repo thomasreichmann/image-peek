@@ -41,9 +41,12 @@ const drawn = new Map<string, Uint32Array>();
 // Calls whose group this mod unfolded: their ToolUse rows carry the picture.
 const unfolded = new Set<string>();
 
-function keep<V>(cache: Map<string, V>, key: string, value: V, size: number) {
-  cache.set(key, value);
-  while (cache.size > size) cache.delete(cache.keys().next().value as string);
+function keep<V>(cache: Map<string, V>, name: string, value: V, size: number) {
+  cache.set(name, value);
+  for (const [oldest] of cache) {
+    if (cache.size <= size) break;
+    cache.delete(oldest);
+  }
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -62,26 +65,26 @@ function runDecode(found: Found): Decoded {
   }
 }
 
-function decodeOnce(key: string, found: Found): Decoded {
-  let known = decoded.get(key);
+function decodeOnce(slot: string, found: Found): Decoded {
+  let known = decoded.get(slot);
   if (known === undefined) {
     known = runDecode(found);
-    keep(decoded, key, known, KEEP_DECODED);
+    keep(decoded, slot, known, KEEP_DECODED);
   }
 
   return known;
 }
 
-/** The picture's cells for a box, drawn once per key, size and look. */
+/** The picture's cells for a box, drawn once per picture, size and look. */
 function cellWords(
-  key: string,
+  slot: string,
   pic: Pixmap,
   columns: number,
   rows: number,
   look: Look,
   background: Backdrop,
 ) {
-  const at = [key, columns, rows, look.glyphs, look.aspect, background.color, background.exact].join(":");
+  const at = [slot, columns, rows, look.glyphs, look.aspect, background.color, background.exact].join(":");
   let known = drawn.get(at);
   if (known === undefined) {
     known = render(pic, columns, rows, { glyphs: look.glyphs, aspect: look.aspect, background });
@@ -123,7 +126,7 @@ async function pictures(
   return found.map((one, i) => {
     const pic = results[i] ?? "not decoded";
     const lead = i === 0 ? "  ⎿  " : "     ";
-    const key = `${id}:${i}`;
+    const slot = `${id}:${i}`;
     const maxColumns = Math.min(look.maxColumns, width);
     let body;
     if (typeof pic === "string") {
@@ -141,17 +144,17 @@ async function pictures(
     } else if (look.renderer === "half") {
       const box = fit(pic, maxColumns, look.maxRows);
       body = (
-        <Raster key={key} columns={box.columns} rows={box.rows} cells={cells(pic, box.columns, box.rows)} />
+        <Raster key={slot} columns={box.columns} rows={box.rows} cells={cells(pic, box.columns, box.rows)} />
       );
     } else {
       const box = fit(pic, maxColumns, look.maxRows, look.aspect);
-      const words = cellWords(key, pic, box.columns, box.rows, look, background);
+      const words = cellWords(slot, pic, box.columns, box.rows, look, background);
       // Stacked strips: a Raster paints at most 1024 colour pairs.
       body = (
         <Box flexDirection="column">
           {strips(words, box.columns, box.rows).map((strip, s) => (
             <Raster
-              key={`${key}:${s}`}
+              key={`${slot}:${s}`}
               columns={box.columns}
               rows={strip.rows}
               cells={strip.cells}

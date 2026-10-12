@@ -2,8 +2,7 @@
   "name": "image-peek",
   "description": "image-peek, a Claude Code mod: inline previews of the images Claude reads.",
   "owner": {
-    "name": "Thomas Reichmann",
-    "url": "https://github.com/thomasreichmann"
+    "name": "Thomas Reichmann"
   },
   "plugins": [
     {

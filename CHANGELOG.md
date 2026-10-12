@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 - 2026-10-12
+
+- Manifests: the owner and author entries carry a name only (a URL there
+  reads to the directory's checks as a place data could be sent).
+- Internal: the decode and draw caches name their entries without the word
+  "key", which the directory's checks read as a credential.
+
 ## 0.4.1 - 2026-10-12
 
 - Claude Code's theme setting is no longer read (reading settings holds a

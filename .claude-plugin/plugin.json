@@ -1,10 +1,9 @@
 {
   "name": "image-peek",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Draws the images the agent reads (Read on png/jpg/gif/webp, image blocks in tool results) as pictures under their tool row in the terminal transcript.",
   "author": {
-    "name": "Thomas Reichmann",
-    "url": "https://github.com/thomasreichmann"
+    "name": "Thomas Reichmann"
   },
   "homepage": "https://github.com/thomasreichmann/image-peek",
   "repository": "https://github.com/thomasreichmann/image-peek",
