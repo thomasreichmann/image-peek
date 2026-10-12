@@ -5,6 +5,10 @@ terminal transcript, right under the tool call that read them. When Claude
 reads a screenshot, a chart or a photo, you see what it saw without leaving
 the terminal.
 
+![Claude Code reading mandelbrot.png: the picture is drawn in coloured block characters under the Read call, followed by Claude's one-sentence description](docs/screenshot.png)
+
+<sub>Windows Terminal with JetBrains Mono Nerd Font; default options except `cellAspect: 2.2` for that font.</sub>
+
 It shows:
 
 - **Read** on PNG, JPEG, GIF and WebP files. Claude Code hands the model a
