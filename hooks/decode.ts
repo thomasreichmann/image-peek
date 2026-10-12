@@ -1,33 +1,30 @@
-// Picture bytes to pixels. PNG, JPEG and GIF are decoded here in plain code,
-// so nothing has to be installed; anything else (WebP, or a JPEG kind the
-// decoder refuses: arithmetic-coded, 12-bit, lossless) is left to ffmpeg by
-// the caller, when the host has it.
+// Picture bytes to pixels: PNG, JPEG, GIF and WebP, decoded here in plain
+// code, so nothing has to be installed and no program is run. A JPEG kind the
+// decoder refuses (arithmetic-coded, 12-bit, lossless) gets no preview.
 
 import { decodeGif, isGif } from "./gif";
 import { decodeJpeg, isJpeg } from "./jpeg";
 import { resample } from "./pixels";
 import type { Pixmap } from "./pixels";
 import { decodePng, isPng } from "./png";
+import { decodeWebp, isWebp } from "./webp";
 
 /** The largest picture decoded here: 16.8 megapixels (a 12 MP photo, a 4K screen). */
 export const MAX_PIXELS = 1 << 24;
 
 export type Format = "png" | "jpeg" | "gif" | "webp" | "other";
 
-const ascii = (bytes: Uint8Array, from: number, to: number) =>
-  String.fromCharCode(...bytes.subarray(from, to));
-
 /** The format by the file's first bytes, whatever it was called. */
 export function format(bytes: Uint8Array): Format {
   if (isPng(bytes)) return "png";
   if (isJpeg(bytes)) return "jpeg";
   if (isGif(bytes)) return "gif";
-  if (ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP") return "webp";
+  if (isWebp(bytes)) return "webp";
 
   return "other";
 }
 
-/** Decodes a PNG, JPEG or GIF (its first frame); throws for anything else. */
+/** Decodes a PNG, JPEG, GIF or WebP (the first frame); throws for anything else. */
 export function decode(bytes: Uint8Array): Pixmap {
   switch (format(bytes)) {
     case "png":
@@ -36,8 +33,10 @@ export function decode(bytes: Uint8Array): Pixmap {
       return decodeJpeg(bytes, MAX_PIXELS);
     case "gif":
       return decodeGif(bytes, MAX_PIXELS);
+    case "webp":
+      return decodeWebp(bytes, MAX_PIXELS);
     default:
-      throw new Error("not a PNG, JPEG or GIF");
+      throw new Error("not a PNG, JPEG, GIF or WebP");
   }
 }
 

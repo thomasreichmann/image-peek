@@ -36,10 +36,27 @@ test("progressive and restart-marker JPEGs decode exactly as the baseline one", 
 
 test("sniffs the format from the bytes, not the name", () => {
   const kinds = FIXTURES.map((f) => format(bytes(f.file)));
-  expect(kinds).toEqual(["png", "png", "png", "png", "jpeg", "jpeg", "jpeg", "jpeg", "jpeg", "gif"]);
+  expect(kinds).toEqual([
+    ...["png", "png", "png", "png"],
+    ...["jpeg", "jpeg", "jpeg", "jpeg", "jpeg"],
+    "gif",
+    ...["webp", "webp", "webp", "webp", "webp"],
+  ]);
   expect(format(bytes(WEBP))).toBe("webp");
   expect(format(new TextEncoder().encode("hello"))).toBe("other");
-  expect(() => decode(bytes(WEBP))).toThrow();
+  expect(() => decode(new TextEncoder().encode("hello"))).toThrow("not a PNG, JPEG, GIF or WebP");
+});
+
+test("decodes a tiny lossless WebP to its one colour", () => {
+  const pic = decode(bytes(WEBP));
+  expect([pic.width, pic.height]).toEqual([2, 2]);
+  expect(Array.from(pic.rgba.slice(0, 4))).toEqual([200, 30, 30, 255]);
+});
+
+test("names the JPEG kinds it refuses", () => {
+  // SOI, then a SOF9 (arithmetic coding) segment.
+  const arithmetic = Uint8Array.of(0xff, 0xd8, 0xff, 0xc9, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0);
+  expect(() => decode(arithmetic)).toThrow("arithmetic-coded JPEG");
 });
 
 test("a cut-off or damaged file throws an Error or decodes, never hangs", () => {

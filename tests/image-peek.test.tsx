@@ -1,25 +1,14 @@
 import { expect, test } from "claude-code/testing";
 
 import { readLook } from "../hooks/options";
-import { cells, findImages, fit, parsePam } from "../hooks/pixels";
+import { cells, findImages, fit } from "../hooks/pixels";
 import type { Pixmap } from "../hooks/pixels";
 import { DEFAULT, DEFAULT_ASPECT, render as renderAt, strips } from "../hooks/render";
 import type { RenderOptions } from "../hooks/render";
 import { FIXTURES, WEBP } from "./fixtures";
 
-// A 2×2 PAM: red, green / transparent, blue.
+// 2×2: red, green / transparent, blue.
 const PIXELS = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 0, 0, 0, 0, 255, 255];
-
-function pam(width: number, height: number, rgba: number[]): Uint8Array {
-  const head = new TextEncoder().encode(
-    `P7\nWIDTH ${width}\nHEIGHT ${height}\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n`,
-  );
-  const out = new Uint8Array(head.length + rgba.length);
-  out.set(head);
-  out.set(rgba, head.length);
-
-  return out;
-}
 
 const READ_OUTPUT = {
   type: "image",
@@ -52,15 +41,6 @@ test("finds images in Read, API and MCP shapes, not in text", () => {
   expect(findImages("plain text")).toEqual([]);
 });
 
-test("reads a PAM and refuses anything else", () => {
-  const img = parsePam(pam(2, 2, PIXELS));
-  expect(img?.width).toBe(2);
-  expect(img?.height).toBe(2);
-  expect(Array.from(img?.rgba ?? [])).toEqual(PIXELS);
-  expect(parsePam(new TextEncoder().encode("P6\n2 2\n255\n"))).toBeUndefined();
-  expect(parsePam(pam(2, 2, PIXELS.slice(0, 8)))).toBeUndefined();
-});
-
 test("fits the box: never wider than the pixels, aspect kept, rows capped", () => {
   expect(fit({ width: 640, height: 360 }, 64, 18)).toEqual({ columns: 64, rows: 18 });
   expect(fit({ width: 640, height: 360 }, 40, 18)).toEqual({ columns: 40, rows: 12 });
@@ -69,8 +49,7 @@ test("fits the box: never wider than the pixels, aspect kept, rows capped", () =
 });
 
 test("packs half blocks, transparency as the terminal's own colour", () => {
-  const img = parsePam(pam(2, 2, PIXELS));
-  if (img === undefined) throw new Error("no img");
+  const img: Pixmap = { width: 2, height: 2, rgba: Uint8Array.from(PIXELS) };
   const bytes = Uint8Array.fromBase64(cells(img, 2, 1));
   const words = Array.from(new Uint32Array(bytes.buffer, bytes.byteOffset, 6));
   // Left cell: red over transparent. Right cell: green over blue.
@@ -273,30 +252,31 @@ test("unfolds a group holding an image and draws the picture on its row", async 
   expect(ran).toEqual([]);
 });
 
-test("hands a WebP to ffmpeg, and says so when there is none", async ($, on) => {
-  let ffmpeg = true;
-  on("process.run", () => ({
-    value: ffmpeg
-      ? { exitCode: 0, stdout: `${pam(2, 2, PIXELS).toBase64()}\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false }
-      : { exitCode: 0, stdout: "", stderr: "sh: 1: ffmpeg: not found\n", isStdoutTruncated: false, isStderrTruncated: false },
-  }));
+test("draws a WebP in the module, and says why when there is no picture", async ($, on) => {
+  const ran: string[][] = [];
+  on("process.run", (_$, e) => {
+    ran.push([...e.argv]);
+    return { value: { exitCode: 1, stdout: "", stderr: "", isStdoutTruncated: false, isStderrTruncated: false } };
+  });
 
-  const result = (id: string) =>
+  const result = (id: string, base64: string) =>
     $.ui.mount({
       plugin: "image-peek",
       surface: "terminal",
       component: "ToolResult",
       requestId: id,
-      props: { ...readCall(id, WEBP, "image/webp") },
+      props: { ...readCall(id, base64, "image/webp") },
     });
 
-  const drawn = await result("toolu_webp_1");
+  const drawn = await result("toolu_webp_1", WEBP);
   expect(await drawn.find({ type: "Raster" })).toBeDefined();
 
-  ffmpeg = false;
-  const missing = await result("toolu_webp_2");
-  expect(await missing.find({ type: "Raster" })).toBeUndefined();
-  expect(await missing.find({ type: "Text", text: "(no preview: WebP needs ffmpeg on PATH)" })).toBeDefined();
+  const garbage = await result("toolu_webp_2", "aGVsbG8=");
+  expect(await garbage.find({ type: "Raster" })).toBeUndefined();
+  expect(
+    await garbage.find({ type: "Text", text: "(no preview: not a PNG, JPEG, GIF or WebP)" }),
+  ).toBeDefined();
+  expect(ran).toEqual([]);
 });
 
 test("leaves a group without images folded", async ($, on) => {

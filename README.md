@@ -36,8 +36,8 @@ every session). The mod starts drawing at once; there is nothing to restart.
 |---|---|
 | Claude Code | a build with mods (2.1.287 and later). Tested on 2.1.296. The mods API is early access and can change between releases |
 | where | the terminal. The desktop app's Code tab and VS Code have no cell graphics, so nothing is drawn there |
-| colour | a truecolor terminal. Inside tmux, Claude Code draws 256 colours unless `CLAUDE_CODE_TMUX_TRUECOLOR=1` and `COLORTERM=truecolor` are set in the environment it starts from; the mod says so once if it finds you in tmux without them |
-| decoding | none: PNG, JPEG and GIF are decoded inside the mod. WebP (and the rare JPEG kinds the decoder refuses: arithmetic-coded, 12-bit, lossless) need `ffmpeg` on `PATH` |
+| colour | a truecolor terminal. Inside tmux, Claude Code draws 256 colours unless `CLAUDE_CODE_TMUX_TRUECOLOR=1` and `COLORTERM=truecolor` are set in the environment it starts from, and previews look coarse without them |
+| decoding | nothing to install: PNG, JPEG, GIF and WebP are decoded inside the mod, in plain TypeScript |
 
 ## Options
 
@@ -84,28 +84,31 @@ most 1024 cells.
 A picture is decoded once (at most 768 px a side) and each box size is drawn
 once (about 25 ms), so scrolling and redraws cost nothing.
 
+The decoders are the mod's own: PNG (every colour type and bit depth,
+interlaced), JPEG (baseline and progressive, greyscale, YCbCr, RGB, Adobe
+CMYK), GIF, and WebP (lossy, lossless, alpha, animated). The WebP decoder
+follows libwebp and gives the same pixels; its constant tables are libwebp's
+(see `THIRD_PARTY_NOTICES.md`).
+
 ## What it runs, reads and stores
 
 - **Network:** none. The mod sends nothing anywhere and fetches nothing.
+- **Programs:** none. It starts no process.
 - **Reads:** the image data already in the transcript's tool results;
   Claude Code's `theme` setting, to guess the background when the
   `background` option is empty; the session's working directory, to shorten
-  paths in captions; the environment variables `TMUX` and
-  `CLAUDE_CODE_TMUX_TRUECOLOR`, for the tmux hint.
-- **Runs:** nothing for PNG, JPEG and GIF. For an image it can't decode
-  itself (WebP, rare JPEG kinds) it runs one local command, with the image on
-  standard input and a 15-second timeout:
-  `sh -c 'base64 --decode | ffmpeg -v error -i pipe:0 -frames:v 1 -vf scale=… -pix_fmt rgba -c:v pam -f image2pipe pipe:1 | base64'`.
-  Without ffmpeg installed, that command does nothing and the preview says so.
-- **Stores:** one flag, `tmuxHintShown`, in the mod's own Claude Code store,
-  so the tmux hint appears once. Decoded pictures are kept in memory for the
-  session only. It writes no files.
+  paths in captions.
+- **Stores:** nothing. Decoded pictures are kept in memory for the session
+  only, and it writes no files.
 
 ## Limits
 
 - Images a subagent reads are not shown: their rows are not in the main
   transcript. PDF pages are not shown either.
-- An animated GIF shows its first frame. JPEG EXIF orientation is not applied.
+- An animated GIF or WebP shows its first frame. JPEG EXIF orientation is not
+  applied.
+- Arithmetic-coded, 12-bit and lossless JPEG are not decoded (rare; the
+  preview says which).
 - Pictures above 16.8 megapixels are not previewed.
 
 ## Development
@@ -124,4 +127,6 @@ that `tsc -p . --noEmit` type-checks the mod.
 
 ## License
 
-MIT
+MIT. The WebP tables in `hooks/webp-tables.ts` and the decoder ported from
+libwebp are under libwebp's BSD 3-Clause license; see
+`THIRD_PARTY_NOTICES.md`.

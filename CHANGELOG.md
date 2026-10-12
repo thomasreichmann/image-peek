@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 - 2026-10-12
+
+- WebP is decoded inside the mod too: lossy (a port of libwebp's decoder,
+  pixel-identical to it), lossless, alpha, and an animation's first frame.
+- The mod runs no programs any more: the ffmpeg fallback is gone. A JPEG
+  kind it refuses (arithmetic-coded, 12-bit, lossless) says so.
+- The tmux hint is gone, and with it every environment-variable read and
+  the stored flag; the README covers tmux.
+- A listing icon (`.claude-plugin/icon.png`) and third-party notices for
+  libwebp.
+
 ## 0.3.0 - 2026-10-12
 
 - PNG, JPEG (baseline and progressive) and GIF are decoded inside the mod: no

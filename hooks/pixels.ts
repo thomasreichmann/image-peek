@@ -1,5 +1,5 @@
-// Pure picture logic: finding images in a tool's output, reading the PAM
-// that ffmpeg hands back, and packing a picture into Raster cells.
+// Pure picture logic: finding images in a tool's output, fitting and
+// resampling a picture, and packing it into half-block Raster cells.
 
 // The runtime has these (ES2026); TypeScript 5's lib does not declare them yet.
 declare global {
@@ -89,32 +89,6 @@ export function findImages(output: unknown, depth = 0): Found[] {
   if (found !== undefined) return [found];
 
   return Object.values(output).flatMap((v) => findImages(v, depth + 1));
-}
-
-/** Reads a P7 (PAM) RGB_ALPHA picture, as `ffmpeg -c:v pam -pix_fmt rgba` writes it. */
-export function parsePam(bytes: Uint8Array): Pixmap | undefined {
-  const END = "ENDHDR\n";
-  const head = new TextDecoder().decode(bytes.subarray(0, 256));
-  const at = head.indexOf(END);
-  if (!head.startsWith("P7\n") || at < 0) return undefined;
-
-  const fields = new Map<string, string>();
-  for (const line of head.slice(3, at).split("\n")) {
-    const [key, ...rest] = line.trim().split(/\s+/);
-    if (key) fields.set(key, rest.join(" "));
-  }
-  const width = Number(fields.get("WIDTH"));
-  const height = Number(fields.get("HEIGHT"));
-  if (fields.get("DEPTH") !== "4" || fields.get("MAXVAL") !== "255") {
-    return undefined;
-  }
-  if (!(width > 0 && height > 0)) return undefined;
-
-  const start = at + END.length;
-  const rgba = bytes.subarray(start, start + width * height * 4);
-  if (rgba.length !== width * height * 4) return undefined;
-
-  return { width, height, rgba };
 }
 
 /**
