@@ -19,22 +19,36 @@
 // here. A cell on a gradient gets its exact mean by mixing two lattice
 // colours inside it (quadrants as a fine dither) and hands what is left on
 // to its neighbours (Floyd–Steinberg); a flat cell is its nearest lattice
-// colour, plain; a cell with a real edge rounds each side; and a colour
-// within a hair of the terminal's background is the terminal's own colour,
-// which is drawn exactly.
+// colour, plain; a cell with a real edge rounds each side; and, when the
+// terminal's background colour is known exactly, a colour within a hair of
+// it is the terminal's own colour, which is drawn exactly.
 //
-// Shapes are measured from JetBrainsMono Nerd Font (cell 600 × 1320 units):
-// Block Elements tile the cell exactly (eighths step by 165 units; U+258D is a
-// third, not three eighths), and the Powerline wedges (U+E0B8–E0BE) fill it
-// corner to corner.
+// Shapes are the ones Unicode defines: Block Elements tile the cell in
+// eighths, halves and quadrants, and the Powerline wedges (U+E0B8–E0BE, Nerd
+// Fonts only) fill it corner to corner. Terminals that draw these themselves
+// (most do) draw them so; a font's own glyphs can be a hair off.
 
 import type { Pixmap } from "./pixels";
 
-/** A cell's height over its width: 1320 / 600 font units. */
-export const CELL_ASPECT = 2.2;
+/**
+ * A cell's height over its width when nothing says otherwise: about 2 for
+ * most monospace fonts (Menlo, SF Mono, Cascadia, DejaVu), 2.2 for JetBrains
+ * Mono.
+ */
+export const DEFAULT_ASPECT = 2;
 
 /** The terminal's own colour, in a Raster's colour words. */
 export const DEFAULT = 0x01000000;
+
+/**
+ * The terminal's background: what see-through pixels are blended over and,
+ * when `exact` (the person gave the colour), what a colour within a hair of
+ * it is drawn as: the terminal's own colour, so a screenshot of the same
+ * theme has no visible frame. Not exact, it is a guess from the theme.
+ */
+export type Backdrop = { color: number; exact: boolean };
+
+const DARK: Backdrop = { color: 0x1e1e1e, exact: false };
 
 /**
  * Distinct colour pairs one Raster paints; past that it snaps cells to the
@@ -42,9 +56,6 @@ export const DEFAULT = 0x01000000;
  * came out with exactly 1024, two 60×15 ones side by side with 900 each).
  */
 const PAIRS = 1024;
-
-/** Catppuccin Mocha base: what transparent pixels are blended over. */
-const BACKGROUND = 0x1e1e2e;
 
 const SX = 8;
 const SY = 16;
@@ -138,10 +149,10 @@ const BLOCKS: Shape[] = [
   ...[1, 2, 3, 4, 5, 6, 7].map((k) =>
     shape(0x2588 - k, k === 4 ? 0x2580 : k === 1 ? 0x2594 : undefined, (_x, y) => y >= k / 8),
   ),
-  // Left blocks, at the font's widths.
+  // Left blocks, in eighths.
   shape(0x258f, undefined, (x) => x < 1 / 8),
   shape(0x258e, undefined, (x) => x < 1 / 4),
-  shape(0x258d, undefined, (x) => x < 1 / 3),
+  shape(0x258d, undefined, (x) => x < 3 / 8),
   shape(0x258c, 0x2590, (x) => x < 1 / 2),
   shape(0x258b, undefined, (x) => x < 5 / 8),
   shape(0x258a, undefined, (x) => x < 3 / 4),
@@ -212,14 +223,14 @@ function packLab(L: number, A: number, B: number): number {
   return (byte(scratch[0]!) << 16) | (byte(scratch[1]!) << 8) | byte(scratch[2]!);
 }
 
-const BG = [
-  LINEAR[(BACKGROUND >> 16) & 255]!,
-  LINEAR[(BACKGROUND >> 8) & 255]!,
-  LINEAR[BACKGROUND & 255]!,
-] as const;
+/** A backdrop colour in linear light and in OKLab. */
+function backdrop(color: number) {
+  const lin = [LINEAR[(color >> 16) & 255]!, LINEAR[(color >> 8) & 255]!, LINEAR[color & 255]!] as const;
+  const lab = new Float64Array(3);
+  oklab(lin[0], lin[1], lin[2], lab, 0);
 
-const BG_LAB = new Float64Array(3);
-oklab(BG[0], BG[1], BG[2], BG_LAB, 0);
+  return { lin, lab };
+}
 
 // The lattice: 16 steps a channel, colour i = (r << 8) | (g << 4) | b.
 const STEPS = 16;
@@ -358,11 +369,12 @@ function taps(size: number, count: number, step: number) {
 
 /**
  * The samples of a `columns × rows` box with the picture placed at its top
- * left, aspect exact (a part row or column past it is transparent): OKLab of
- * the picture over the background, and coverage.
+ * left, aspect exact for cells `aspect` times as tall as wide (a part row or
+ * column past it is transparent): OKLab of the picture over `bg` (linear
+ * light), and coverage.
  */
-function sample(img: Pixmap, columns: number, rows: number) {
-  const ratio = (CELL_ASPECT * img.width) / img.height;
+function sample(img: Pixmap, columns: number, rows: number, aspect: number, bg: readonly number[]) {
+  const ratio = (aspect * img.width) / img.height;
   const wide = Math.min(columns, rows * ratio);
   // Ending on a half row (at most 1/4 row of stretch): the only glyphs with
   // ink at a cell's top are ▀ and ▔, so a picture ending at 3/8 of a row
@@ -411,7 +423,7 @@ function sample(img: Pixmap, columns: number, rows: number) {
       a = Math.min(1, a);
       const s = gy * gw + gx;
       alpha[s] = a;
-      oklab(r + BG[0] * (1 - a), g + BG[1] * (1 - a), b + BG[2] * (1 - a), lab, s * 3);
+      oklab(r + bg[0]! * (1 - a), g + bg[1]! * (1 - a), b + bg[2]! * (1 - a), lab, s * 3);
     }
   }
 
@@ -476,10 +488,14 @@ function flatCells(lab: Float32Array, alpha: Float32Array, gw: number, columns: 
 }
 
 export type RenderOptions = {
-  /** Block Elements only, or with the Powerline wedges (the default). */
+  /** Block Elements only (the default), or with the Powerline wedges. */
   glyphs?: Glyphs;
   /** Colours on a Raster's 4-bit lattice (the default), or exact. */
   lattice?: boolean;
+  /** A cell's height over its width (DEFAULT_ASPECT). */
+  aspect?: number;
+  /** The terminal's background (a dark guess by default). */
+  background?: Backdrop;
 };
 
 /**
@@ -493,9 +509,11 @@ export function render(
   rows: number,
   options: RenderOptions = {},
 ): Uint32Array {
-  const shapes = SETS[options.glyphs ?? "wedges"];
+  const shapes = SETS[options.glyphs ?? "blocks"];
   const onLattice = options.lattice !== false;
-  const { gw, lab, alpha } = sample(img, columns, rows);
+  const background = options.background ?? DARK;
+  const { lin: BG, lab: BG_LAB } = backdrop(background.color);
+  const { gw, lab, alpha } = sample(img, columns, rows, options.aspect ?? DEFAULT_ASPECT, BG);
   const words = new Uint32Array(columns * rows * 3);
   // Per sample: L, a, b and coverage, the last so a picture's edge is a
   // split of its own and transparency never merges with a dark colour.
@@ -593,6 +611,7 @@ export function render(
       // background beside an edge stays the background, the error dropped.
       const [e0, e1, e2] = isFlat ? [0, 0, 0] : [err[e]!, err[e + 1]!, err[e + 2]!];
       const nearBackground = (L: number, A: number, B: number) =>
+        background.exact &&
         distance(BG_LAB, 0, L - e0, A - e1, B - e2) < NEAR_BACKGROUND * NEAR_BACKGROUND;
 
       // What is drawn, and the error a dithered cell leaves (handed on).
@@ -658,7 +677,12 @@ export function render(
         } else {
           glyph = sh.glyph;
           // The terminal's colour as ink: only an explicit colour can say it.
-          fg = inside === DEFAULT ? (onLattice ? word(nearest(BG_LAB[0]!, BG_LAB[1]!, BG_LAB[2]!)) : BACKGROUND) : inside;
+          fg =
+            inside === DEFAULT
+              ? onLattice
+                ? word(nearest(BG_LAB[0]!, BG_LAB[1]!, BG_LAB[2]!))
+                : background.color
+              : inside;
           bg = outside;
         }
       }

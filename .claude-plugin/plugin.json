@@ -1,7 +1,15 @@
 {
   "name": "image-peek",
-  "version": "0.2.0",
-  "description": "Draws the images the agent reads (Read on png/jpg/gif/webp, image blocks in tool results) as pictures under their tool row in the transcript.",
+  "version": "0.3.0",
+  "description": "Draws the images the agent reads (Read on png/jpg/gif/webp, image blocks in tool results) as pictures under their tool row in the terminal transcript.",
+  "author": {
+    "name": "Thomas Reichmann",
+    "url": "https://github.com/thomasreichmann"
+  },
+  "homepage": "https://github.com/thomasreichmann/image-peek",
+  "repository": "https://github.com/thomasreichmann/image-peek",
+  "license": "MIT",
+  "keywords": ["images", "preview", "terminal", "transcript", "mod"],
   "userConfig": {
     "maxColumns": {
       "type": "number",
@@ -18,16 +26,28 @@
     "renderer": {
       "type": "string",
       "title": "Renderer",
-      "description": "cells fits each cell's glyph and two colours to the picture (block elements, eighths, quadrants, wedges) and works in any truecolor terminal, tmux included. half is the old one: half blocks, two pixels a cell. image uses the kitty graphics protocol (kitty, Ghostty, outside tmux) for real pixels.",
+      "description": "cells fits each cell's glyph and two colours to the picture (block elements: eighths, halves, quadrants) and works in any truecolor terminal, tmux included. half is the simple one: half blocks, two pixels a cell. image uses the kitty graphics protocol (kitty, Ghostty, outside tmux) for real pixels.",
       "default": "cells",
       "options": ["cells", "half", "image"]
     },
     "glyphs": {
       "type": "string",
       "title": "Glyphs (cells renderer)",
-      "description": "wedges adds the Powerline diagonal wedges (U+E0B8-E0BE) for smooth diagonal edges; needs a Nerd Font. blocks uses Block Elements only, for any font.",
-      "default": "wedges",
-      "options": ["wedges", "blocks"]
+      "description": "blocks uses Block Elements only and works with any font. wedges adds the Powerline diagonal wedges (U+E0B8-E0BE) for smoother diagonal edges; it needs a Nerd Font, or a terminal that draws Powerline glyphs itself.",
+      "default": "blocks",
+      "options": ["blocks", "wedges"]
+    },
+    "cellAspect": {
+      "type": "number",
+      "title": "Cell aspect (height / width)",
+      "description": "How many times taller than wide one terminal cell is, so pictures keep their shape: about 2 for Menlo, SF Mono, Cascadia and DejaVu Sans Mono, 2.2 for JetBrains Mono. A circle drawn too tall means the value is too low.",
+      "default": 2
+    },
+    "background": {
+      "type": "string",
+      "title": "Terminal background (#rrggbb)",
+      "description": "Your terminal's background colour, e.g. #1e1e2e. When set, picture colours within a hair of it are drawn as the terminal's own background (a screenshot of your own terminal shows no frame), and see-through edges blend over it. Empty: edges blend over a guess from Claude Code's theme.",
+      "default": ""
     }
   }
 }

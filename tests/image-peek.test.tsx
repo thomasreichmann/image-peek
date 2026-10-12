@@ -1,8 +1,11 @@
 import { expect, test } from "claude-code/testing";
 
+import { readLook } from "../hooks/options";
 import { cells, findImages, fit, parsePam } from "../hooks/pixels";
 import type { Pixmap } from "../hooks/pixels";
-import { CELL_ASPECT, DEFAULT, render, strips } from "../hooks/render";
+import { DEFAULT, DEFAULT_ASPECT, render as renderAt, strips } from "../hooks/render";
+import type { RenderOptions } from "../hooks/render";
+import { FIXTURES, WEBP } from "./fixtures";
 
 // A 2×2 PAM: red, green / transparent, blue.
 const PIXELS = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 0, 0, 0, 0, 255, 255];
@@ -74,6 +77,26 @@ test("packs half blocks, transparency as the terminal's own colour", () => {
   expect(words).toEqual([0x2580, 0xff0000, 0x01000000, 0x2580, 0x00ff00, 0x0000ff]);
 });
 
+test("reads the options, each falling back to its default", () => {
+  expect(readLook({})).toEqual({
+    maxColumns: 64,
+    maxRows: 18,
+    renderer: "cells",
+    glyphs: "blocks",
+    aspect: DEFAULT_ASPECT,
+    background: undefined,
+  });
+  const look = readLook({ glyphs: "wedges", cellAspect: 2.2, background: " #1E1E2E " });
+  expect([look.glyphs, look.aspect, look.background]).toEqual(["wedges", 2.2, 0x1e1e2e]);
+  expect(readLook({ cellAspect: 0, background: "navy" })).toMatchObject({ aspect: 2, background: undefined });
+});
+
+// The cell tests draw pictures 10 × 22 px a cell, so cells 2.2 times as tall
+// as wide hold them exactly.
+const CELL = { aspect: 2.2 };
+const render = (img: Pixmap, columns: number, rows: number, options: RenderOptions = {}) =>
+  renderAt(img, columns, rows, { ...CELL, ...options });
+
 /** A picture one cell's shape (10 × 22 px), each pixel from `at(x, y)`. */
 function cell(at: (x: number, y: number) => number[]): Pixmap {
   const width = 10, height = 22;
@@ -98,9 +121,10 @@ function near(a: number, b: number) {
   return [16, 8, 0].every((s) => Math.abs(((a >> s) & 255) - ((b >> s) & 255)) <= 1);
 }
 
-test("cells: boxes are fitted to a cell 2.2 times as tall as wide", () => {
-  expect(CELL_ASPECT).toBe(2.2);
-  expect(fit({ width: 640, height: 360 }, 64, 18, CELL_ASPECT)).toEqual({ columns: 64, rows: 17 });
+test("cells: boxes are fitted to the cell's aspect, 2 unless set", () => {
+  expect(DEFAULT_ASPECT).toBe(2);
+  expect(fit({ width: 640, height: 360 }, 64, 18, DEFAULT_ASPECT)).toEqual({ columns: 64, rows: 18 });
+  expect(fit({ width: 640, height: 360 }, 64, 18, 2.2)).toEqual({ columns: 64, rows: 17 });
 });
 
 test("cells: a half split is a half block with both colours exact", () => {
@@ -124,10 +148,10 @@ test("cells: transparency is the terminal's own colour, on the glyph's backgroun
   expect(first(render(cell(() => NONE), 1, 1))).toEqual([0x20, DEFAULT, DEFAULT]);
 });
 
-test("cells: a diagonal is a wedge, or the best block without them", () => {
+test("cells: a diagonal is a wedge when asked, else the best block", () => {
   const diagonal = cell((x, y) => (x / 10 < y / 22 ? RED : BLUE));
-  expect(first(render(diagonal, 1, 1))[0]).toBe(0xe0b8);
-  expect(first(render(diagonal, 1, 1, { glyphs: "blocks" }))[0]).not.toBe(0xe0b8);
+  expect(first(render(diagonal, 1, 1, { glyphs: "wedges" }))[0]).toBe(0xe0b8);
+  expect(first(render(diagonal, 1, 1))[0]).not.toBe(0xe0b8);
 });
 
 test("cells: a flat cell is a plain space in its colour", () => {
@@ -165,9 +189,18 @@ test("cells: a flat fill off the lattice is one plain colour, not a dither", () 
   expect(cells[0]).toBe([0x20, DEFAULT, 0x333344].join());
 });
 
-test("cells: the terminal's background, or within a hair of it, is its own colour", () => {
-  const words = render(picture(4, 2, () => [0x1f, 0x1e, 0x2e, 255]), 4, 2);
-  expect(colours(words)).toEqual([]);
+test("cells: a known background, or within a hair of it, is the terminal's own colour", () => {
+  const shot = picture(4, 2, () => [0x1f, 0x1e, 0x2e, 255]);
+  expect(colours(render(shot, 4, 2, { background: { color: 0x1e1e2e, exact: true } }))).toEqual([]);
+  // A guessed background is never drawn as the terminal's: it may be wrong.
+  expect(colours(render(shot, 4, 2, { background: { color: 0x1e1e2e, exact: false } })).length).toBeGreaterThan(0);
+});
+
+test("cells: see-through edges blend over the background given", () => {
+  const half = picture(1, 1, () => [255, 255, 255, 128]);
+  const [, , onDark] = first(render(half, 1, 1, { background: { color: 0x000000, exact: false } }));
+  const [, , onLight] = first(render(half, 1, 1, { background: { color: 0xffffff, exact: false } }));
+  expect(((onDark! >> 16) & 255) < ((onLight! >> 16) & 255)).toBe(true);
 });
 
 test("cells: a gentle gradient is dithered inside its cells", () => {
@@ -185,6 +218,19 @@ test("cells: strips keep every Raster within 1024 cells", () => {
   expect(strips(wide, 100, 40).every((s) => s.rows * 100 <= 1024)).toBe(true);
 });
 
+/** A Read of `base64`, as its tool row holds it. */
+function readCall(id: string, base64: string, type = "image/png") {
+  return {
+    tool_use_id: id,
+    tool: "Read",
+    input: { file_path: "/work/shot.png" },
+    isRunning: false,
+    isErrored: false,
+    isInterrupted: false,
+    output: { ...READ_OUTPUT, file: { ...READ_OUTPUT.file, base64, type } },
+  };
+}
+
 test("unfolds a group holding an image and draws the picture on its row", async ($, on) => {
   const seen: boolean[] = [];
   on("ui.render", { component: "ToolGroup" }, ($, e) => {
@@ -193,26 +239,15 @@ test("unfolds a group holding an image and draws the picture on its row", async 
 
     return <Text>group</Text>;
   });
-  on("process.run", () => ({
-    value: {
-      exitCode: 0,
-      stdout: pam(2, 2, PIXELS).toBase64(),
-      stderr: "",
-      isStdoutTruncated: false,
-      isStderrTruncated: false,
-    },
-  }));
+  const ran: string[][] = [];
+  on("process.run", (_$, e) => {
+    ran.push([...e.argv]);
+    return { value: { exitCode: 1, stdout: "", stderr: "", isStdoutTruncated: false, isStderrTruncated: false } };
+  });
   on("session.cwd", () => ({ value: "/work" }));
 
-  const call = {
-    tool_use_id: "toolu_1",
-    tool: "Read",
-    input: { file_path: "/work/shot.png" },
-    isRunning: false,
-    isErrored: false,
-    isInterrupted: false,
-    output: READ_OUTPUT,
-  };
+  // A 7 × 5 RGBA PNG: decoded in the module, no process run.
+  const call = readCall("toolu_1", FIXTURES[0]!.file);
   await $.ui.mount({
     plugin: "image-peek",
     surface: "terminal",
@@ -234,8 +269,34 @@ test("unfolds a group holding an image and draws the picture on its row", async 
     await row.find({ type: "Text", text: "Read image (29.6KB) · 640×360" }),
   ).toBeDefined();
   const raster = await row.find({ type: "Raster" });
-  expect(raster?.props.columns).toBe(2);
-  expect(raster?.props.rows).toBe(1);
+  expect([raster?.props.columns, raster?.props.rows]).toEqual([7, 3]);
+  expect(ran).toEqual([]);
+});
+
+test("hands a WebP to ffmpeg, and says so when there is none", async ($, on) => {
+  let ffmpeg = true;
+  on("process.run", () => ({
+    value: ffmpeg
+      ? { exitCode: 0, stdout: `${pam(2, 2, PIXELS).toBase64()}\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false }
+      : { exitCode: 0, stdout: "", stderr: "sh: 1: ffmpeg: not found\n", isStdoutTruncated: false, isStderrTruncated: false },
+  }));
+
+  const result = (id: string) =>
+    $.ui.mount({
+      plugin: "image-peek",
+      surface: "terminal",
+      component: "ToolResult",
+      requestId: id,
+      props: { ...readCall(id, WEBP, "image/webp") },
+    });
+
+  const drawn = await result("toolu_webp_1");
+  expect(await drawn.find({ type: "Raster" })).toBeDefined();
+
+  ffmpeg = false;
+  const missing = await result("toolu_webp_2");
+  expect(await missing.find({ type: "Raster" })).toBeUndefined();
+  expect(await missing.find({ type: "Text", text: "(no preview: WebP needs ffmpeg on PATH)" })).toBeDefined();
 });
 
 test("leaves a group without images folded", async ($, on) => {
