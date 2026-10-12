@@ -84,6 +84,23 @@ most 1024 cells.
 A picture is decoded once (at most 768 px a side) and each box size is drawn
 once (about 25 ms), so scrolling and redraws cost nothing.
 
+## What it runs, reads and stores
+
+- **Network:** none. The mod sends nothing anywhere and fetches nothing.
+- **Reads:** the image data already in the transcript's tool results;
+  Claude Code's `theme` setting, to guess the background when the
+  `background` option is empty; the session's working directory, to shorten
+  paths in captions; the environment variables `TMUX` and
+  `CLAUDE_CODE_TMUX_TRUECOLOR`, for the tmux hint.
+- **Runs:** nothing for PNG, JPEG and GIF. For an image it can't decode
+  itself (WebP, rare JPEG kinds) it runs one local command, with the image on
+  standard input and a 15-second timeout:
+  `sh -c 'base64 --decode | ffmpeg -v error -i pipe:0 -frames:v 1 -vf scale=… -pix_fmt rgba -c:v pam -f image2pipe pipe:1 | base64'`.
+  Without ffmpeg installed, that command does nothing and the preview says so.
+- **Stores:** one flag, `tmuxHintShown`, in the mod's own Claude Code store,
+  so the tmux hint appears once. Decoded pictures are kept in memory for the
+  session only. It writes no files.
+
 ## Limits
 
 - Images a subagent reads are not shown: their rows are not in the main
