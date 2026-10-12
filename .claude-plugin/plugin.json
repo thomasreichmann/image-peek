@@ -1,6 +1,6 @@
 {
   "name": "image-peek",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Draws the images the agent reads (Read on png/jpg/gif/webp, image blocks in tool results) as pictures under their tool row in the terminal transcript.",
   "author": {
     "name": "Thomas Reichmann",
@@ -46,7 +46,7 @@
     "background": {
       "type": "string",
       "title": "Terminal background (#rrggbb)",
-      "description": "Your terminal's background colour, e.g. #1e1e2e. When set, picture colours within a hair of it are drawn as the terminal's own background (a screenshot of your own terminal shows no frame), and see-through edges blend over it. Empty: edges blend over a guess from Claude Code's theme.",
+      "description": "Your terminal's background colour, e.g. #1e1e2e. When set, picture colours within a hair of it are drawn as the terminal's own background (a screenshot of your own terminal shows no frame), and see-through edges blend over it. Empty: edges blend over dark grey; on a light theme, set it.",
       "default": ""
     }
   }

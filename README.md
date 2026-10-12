@@ -64,7 +64,7 @@ Set them in `/config`, or in `~/.claude/settings.json`:
 | `renderer` | `cells` | `cells` picks the best glyph and two colours for every cell; `half` is plain half blocks, two pixels a cell; `image` sends real pixels with the kitty graphics protocol (kitty, Ghostty; not inside tmux) |
 | `glyphs` | `blocks` | `blocks` uses Block Elements only, which every font and terminal has. `wedges` adds the Powerline diagonal wedges for smoother diagonal edges; it needs a Nerd Font or a terminal that draws Powerline glyphs itself |
 | `cellAspect` | `2` | how many times taller than wide a terminal cell is, so pictures keep their shape: about 2 for Menlo, SF Mono, Cascadia and DejaVu Sans Mono, 2.2 for JetBrains Mono. If circles come out tall, raise it |
-| `background` | empty | your terminal's background as `#rrggbb`. When set, picture colours within a hair of it are drawn as the terminal's own background, so a screenshot of your own terminal has no visible frame, and see-through edges blend over it. Empty, edges blend over a guess from Claude Code's theme |
+| `background` | empty | your terminal's background as `#rrggbb`. When set, picture colours within a hair of it are drawn as the terminal's own background, so a screenshot of your own terminal has no visible frame, and see-through edges blend over it. Empty, edges blend over dark grey; on a light theme, set it |
 
 ## How it draws
 
@@ -94,10 +94,9 @@ follows libwebp and gives the same pixels; its constant tables are libwebp's
 
 - **Network:** none. The mod sends nothing anywhere and fetches nothing.
 - **Programs:** none. It starts no process.
-- **Reads:** the image data already in the transcript's tool results;
-  Claude Code's `theme` setting, to guess the background when the
-  `background` option is empty; the session's working directory, to shorten
-  paths in captions.
+- **Reads:** the image data already in the transcript's tool results, and
+  the session's working directory, to shorten paths in captions. It reads no
+  settings, files or environment variables.
 - **Stores:** nothing. Decoded pictures are kept in memory for the session
   only, and it writes no files.
 

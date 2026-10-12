@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1 - 2026-10-12
+
+- Claude Code's theme setting is no longer read (reading settings holds a
+  directory listing for review). Without the `background` option,
+  see-through edges blend over dark grey; on a light theme, set it.
+- Internal: no accessor properties.
+
 ## 0.4.0 - 2026-10-12
 
 - WebP is decoded inside the mod too: lossy (a port of libwebp's decoder,
@@ -8,8 +15,7 @@
   kind it refuses (arithmetic-coded, 12-bit, lossless) says so.
 - The tmux hint is gone, and with it every environment-variable read and
   the stored flag; the README covers tmux.
-- A listing icon (`.claude-plugin/icon.png`) and third-party notices for
-  libwebp.
+- A listing icon and third-party notices for libwebp.
 
 ## 0.3.0 - 2026-10-12
 

@@ -43,7 +43,7 @@ export class LsbBits {
   }
 
   /** True once more bits were taken than the data holds. */
-  get overrun(): boolean {
+  overrun(): boolean {
     return this.pos - (this.cnt >> 3) > this.data.length;
   }
 }
@@ -169,7 +169,7 @@ function readCode(br: LsbBits, alphabet: number): Code {
       s += repeat;
     }
   }
-  if (br.overrun) throw new Error("WebP data ends early");
+  if (br.overrun()) throw new Error("WebP data ends early");
 
   return buildCode(lengths);
 }
@@ -335,7 +335,7 @@ function imageData(
         y++;
       }
     }
-    if (br.overrun) throw new Error("WebP data ends early");
+    if (br.overrun()) throw new Error("WebP data ends early");
   }
 
   return out;

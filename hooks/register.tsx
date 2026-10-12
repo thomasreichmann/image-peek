@@ -93,19 +93,14 @@ function cellWords(
 
 /**
  * The terminal's background: the person's colour when given, exact; else a
- * guess from Claude Code's theme, used only to blend see-through edges.
+ * dark grey (the default theme is dark), used only to blend see-through
+ * edges. Claude Code's theme setting is not read: reading settings puts the
+ * mod on a directory review hold.
  */
-async function backdrop($: EngineInterface, look: Look): Promise<Backdrop> {
-  if (look.background !== undefined) return { color: look.background, exact: true };
-  let theme = "";
-  try {
-    const row = (await $.config.list()).find((r) => r.key === "theme");
-    theme = String(row?.value ?? "");
-  } catch {
-    // Unknown: dark, the default theme.
-  }
-
-  return { color: theme.includes("light") ? 0xffffff : 0x1e1e1e, exact: false };
+function backdrop(look: Look): Backdrop {
+  return look.background !== undefined
+    ? { color: look.background, exact: true }
+    : { color: 0x1e1e1e, exact: false };
 }
 
 function shortPath(path: string, cwd: string): string {
@@ -122,7 +117,7 @@ async function pictures(
 ) {
   const { Box, Text, Raster, Image } = $.ui.resolve(e);
   const width = (e.viewport?.columns ?? 80) - INDENT - MARGIN;
-  const background = await backdrop($, look);
+  const background = backdrop(look);
   const results = found.map((one, i) => decodeOnce(`${id}:${i}`, one));
 
   return found.map((one, i) => {
