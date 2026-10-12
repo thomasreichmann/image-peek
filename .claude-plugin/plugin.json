@@ -1,0 +1,33 @@
+{
+  "name": "image-peek",
+  "version": "0.2.0",
+  "description": "Draws the images the agent reads (Read on png/jpg/gif/webp, image blocks in tool results) as pictures under their tool row in the transcript.",
+  "userConfig": {
+    "maxColumns": {
+      "type": "number",
+      "title": "Max width (columns)",
+      "description": "Widest a preview is drawn, in terminal columns; it is also kept 6 columns inside the transcript.",
+      "default": 64
+    },
+    "maxRows": {
+      "type": "number",
+      "title": "Max height (rows)",
+      "description": "Tallest a preview is drawn, in terminal rows.",
+      "default": 18
+    },
+    "renderer": {
+      "type": "string",
+      "title": "Renderer",
+      "description": "cells fits each cell's glyph and two colours to the picture (block elements, eighths, quadrants, wedges) and works in any truecolor terminal, tmux included. half is the old one: half blocks, two pixels a cell. image uses the kitty graphics protocol (kitty, Ghostty, outside tmux) for real pixels.",
+      "default": "cells",
+      "options": ["cells", "half", "image"]
+    },
+    "glyphs": {
+      "type": "string",
+      "title": "Glyphs (cells renderer)",
+      "description": "wedges adds the Powerline diagonal wedges (U+E0B8-E0BE) for smooth diagonal edges; needs a Nerd Font. blocks uses Block Elements only, for any font.",
+      "default": "wedges",
+      "options": ["wedges", "blocks"]
+    }
+  }
+}
